@@ -18,26 +18,21 @@ public class Asteroid extends Point {
     private double r;
     private double velocityX;
     private double velocityY;
-    private double accelerationX;
-    private double accelerationY;
     private double mass;
 
     public Asteroid(double x, double y, Point userData) {
         super(x, y, userData);
-        highlight = false;
-        r = RandomGenerator.getDefault().nextDouble(2.0, 6.0);
+        r = RandomGenerator.getDefault().nextDouble(3.0, 5.0);
         mass = Math.PI * r * r;
         velocityY = RandomGenerator.getDefault().nextDouble(-3.0,3.0);
         velocityX = RandomGenerator.getDefault().nextDouble(-3.0,3.0);
-        accelerationX = RandomGenerator.getDefault().nextDouble(-3.0,3.0);
-        accelerationY = RandomGenerator.getDefault().nextDouble(-3.0,3.0);
     }
 
     public void move() {
         checkBoundaries();
         this.x += velocityX;
         this.y += velocityY;
-
+        Game.getQuadTree().update(this);
     }
 
     public void checkBoundaries() {
@@ -46,22 +41,22 @@ public class Asteroid extends Point {
 
         if (x - r < 0) {
             x = r;
-            velocityX = -velocityX;
+            velocityX *= -1;
         }
 
         else if (x + r > screenWidth) {
             x = screenWidth - r;
-            velocityX = -velocityX;
+            velocityX *= -1;
         }
 
         if (y - r < 0) {
             y = r;
-            velocityY = -velocityY;
+            velocityY *= -1;
         }
 
         else if (y + r > screenHeight) {
             y = screenHeight - r;
-            velocityY = -velocityY;
+            velocityY *= -1;
         }
     }
 
@@ -71,44 +66,63 @@ public class Asteroid extends Point {
         circle.setCenterX(x);
         circle.setCenterY(y);
         circle.setRadius(r);
-        circle.setFill(highlight ? Color.TOMATO : Color.BLUEVIOLET);
+        circle.setFill(Color.WHITE);
         pane.getChildren().add(circle);
-        highlight = false;
     }
 
     public void checkCollisions(List<Asteroid> others) {
         if (others == null) {
             return;
         }
-        this.highlight = false;
         for (Asteroid other : others) {
-            if (other.getUserData() != null) {
-                other = (Asteroid) other.getUserData();
-            }
-            if (this != other) {
-                double d = distanceFrom(other);
-                if (d < other.r / 2 + this.r / 2) {
-                    this.highlight = true;
-                    other.highlight = true;
-                }
+            if (this != other && this.intersects(other)) {
+                this.collide(other);
             }
         }
     }
 
-//    public double dist(double x1, double y1, double x2, double y2) {
-//        double dx = x1 - x2;
-//        double dy = y1 - y2;
-//        return Math.sqrt(dx * dx + dy * dy);
-//    }
+    private void collide(Asteroid other) {
+        double dx = other.x - this.x;
+        double dy = other.y - this.y;
 
-    public boolean intersects(Asteroid other) {
-        double d =distanceFrom(other);
-        return d < other.r + this.r;
+        double distanceSquared = dx * dx + dy * dy;
+
+        if (distanceSquared < 1e-10) {
+            return;
+        }
+
+        double dvx = other.velocityX - this.velocityX;
+        double dvy = other.velocityY - this.velocityY;
+
+        double dotProduct = (dvx * dx + dvy * dy) / distanceSquared;
+
+        double m1 = this.mass;
+        double m2 = other.mass;
+
+        double coefficient1 = (2 * m2 / (m1 + m2)) * dotProduct;
+        this.velocityX += coefficient1 * dx;
+        this.velocityY += coefficient1 * dy;
+
+        double coefficient2 = (2 * m1 / (m1 + m2)) * dotProduct;
+        other.velocityX -= coefficient2 * dx;
+        other.velocityY -= coefficient2 * dy;
     }
 
     public Rectangle getBoundary() {
-        return new Rectangle(x, y, (int) (r * 2), (int) (r * 2));
+        return new Rectangle(x, y, r * 2, r * 2);
+    }
+    public double sqDistanceFrom(Asteroid other) {
+        double dx = other.x - this.x;
+        double dy = other.y - this.y;
+        return dx * dx + dy * dy;
     }
 
+    public double distanceFrom(Asteroid other) {
+        return Math.sqrt(this.sqDistanceFrom(other));
+    }
 
+    public boolean intersects(Asteroid other) {
+        double d = this.distanceFrom(other);
+        return d < (this.r + other.r);
+    }
 }

@@ -21,13 +21,12 @@ public class Rectangle {
                 point.getY() >= this.y && point.getY() <= this.y + this.getHeight());
     }
 
-
-
     public boolean intersects(Rectangle range) {
-        return !(this.getWidth() < range.x || range.getWidth() < this.x ||
-                this.getHeight() < range.y || range.getHeight() < this.y);
+        return !(this.x + this.width < range.x ||
+                this.x > range.x + range.width ||
+                this.y + this.height < range.y ||
+                this.y > range.y + range.height);
     }
-
 
 
     public Rectangle subdivide(String quadrant) {

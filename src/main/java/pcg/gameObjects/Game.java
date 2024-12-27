@@ -20,6 +20,9 @@ import java.util.List;
 import java.util.random.RandomGenerator;
 
 public class Game extends Application {
+    private final int maxDepth = 8;
+    private final int capacity = 1;
+    private final int countOfAsteroids = 50;
     @Getter
     private static QuadTree quadTree;
     private List<Asteroid> asteroids;
@@ -37,8 +40,8 @@ public class Game extends Application {
         asteroids = new ArrayList<>();
         quadTree = new QuadTree(new pcg.entities.Rectangle(0,
                 0,
-                screenWidth, screenHeight), 1, 1);
-        for (int i = 0; i < 67; i++) {
+                screenWidth, screenHeight), capacity, maxDepth);
+        for (int i = 0; i < countOfAsteroids; i++) {
             Point p = new Point(RandomGenerator.getDefault().nextInt(screenWidth),
                     RandomGenerator.getDefault().nextInt(screenHeight));
             Asteroid asteroid = new Asteroid(p.getX(), p.getY(), p);
@@ -54,13 +57,11 @@ public class Game extends Application {
                 root.getChildren().clear();
 
                 for (Asteroid a : asteroids) {
-                    try {
-                        quadTree.insert(a);
-                    } catch (Exception e) {
-                        throw  new RuntimeException(e);
-                    }
                     a.move();
+                    quadTree.insert(a);
                     a.render(root);
+                    List<Asteroid> found = quadTree.query(a.getBoundary(), new ArrayList<>());
+                    a.checkCollisions(found);
                 }
                 drawQuadTree(root, quadTree);
                 }
@@ -69,27 +70,21 @@ public class Game extends Application {
     }
 
     private void drawQuadTree(Pane pane, QuadTree tree) {
-        // Получаем границы квадродерева
         pcg.entities.Rectangle boundary = tree.getBoundary();
 
-        // Создаем новый прямоугольник для отображения
         Rectangle rectangle = new Rectangle();
 
-        // Устанавливаем координаты верхнего левого угла
-        rectangle.setX(boundary.getX()); // Используем left для X
-        rectangle.setY(boundary.getY());   // Используем top для Y
-        rectangle.setWidth(boundary.getWidth()); // Ширина прямоугольника
-        rectangle.setHeight(boundary.getHeight()); // Высота прямоугольника
+        rectangle.setX(boundary.getX());
+        rectangle.setY(boundary.getY());
+        rectangle.setWidth(boundary.getWidth());
+        rectangle.setHeight(boundary.getHeight());
 
-        // Настройки стиля
         rectangle.setStrokeWidth(0.3);
-        rectangle.setStroke(Color.SKYBLUE);
+        rectangle.setStroke(Color.LIMEGREEN);
         rectangle.setFill(Color.TRANSPARENT);
 
-        // Добавляем прямоугольник на панель
         pane.getChildren().add(rectangle);
 
-        // Рекурсивно рисуем дочерние узлы, если они существуют
         if (tree.getNorthWest() != null) drawQuadTree(pane, tree.getNorthWest());
         if (tree.getNorthEast() != null) drawQuadTree(pane, tree.getNorthEast());
         if (tree.getSouthWest() != null) drawQuadTree(pane, tree.getSouthWest());

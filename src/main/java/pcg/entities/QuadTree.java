@@ -8,19 +8,27 @@ import java.util.List;
 
 @Getter
 public class QuadTree {
-    private final int DEFAULT_CAPACITY = 1;
-    private final int MAX_DEPTH = 8;
-    private int capacity;
-    private int depth;
+    private final int MAX_DEPTH;
+    private final int capacity;
+    private final int depth;
     private final Rectangle boundary;
     private QuadTree northWest, northEast, southWest, southEast;
-    private List<Asteroid> points;
+    private final List<Asteroid> points;
     private boolean divided;
 
-    public QuadTree(Rectangle boundary, int capacity, int depth) {
+    public QuadTree(Rectangle boundary, int capacity, int maxDepth) {
+        this.boundary = boundary;
+        this.capacity = capacity;
+        this.depth = 1;
+        this.MAX_DEPTH = maxDepth;
+        this.points = new ArrayList<>();
+        this.divided = false;
+    }
+    public QuadTree(Rectangle boundary, int capacity, int depth, int maxDepth) {
         this.boundary = boundary;
         this.capacity = capacity;
         this.depth = depth;
+        this.MAX_DEPTH = maxDepth;
         this.points = new ArrayList<>();
         this.divided = false;
     }
@@ -33,43 +41,38 @@ public class QuadTree {
     }
 
     public void clear() {
-        this.points.clear(); // Очищаем точки в текущем узле
+        this.points.clear();
 
         if (this.divided) {
-            // Рекурсивно очищаем дочерние узлы
             if (northWest != null) {
-                northWest.clear(); // Очищаем северо-западный узел
-                northWest = null; // Освобождаем память
+                northWest.clear();
+                northWest = null;
             }
             if (northEast != null) {
-                northEast.clear(); // Очищаем северо-восточный узел
-                northEast = null; // Освобождаем память
+                northEast.clear();
+                northEast = null;
             }
             if (southWest != null) {
-                southWest.clear(); // Очищаем юго-западный узел
-                southWest = null; // Освобождаем память
+                southWest.clear();
+                southWest = null;
             }
             if (southEast != null) {
-                southEast.clear(); // Очищаем юго-восточный узел
-                southEast = null; // Освобождаем память
+                southEast.clear();
+                southEast = null;
             }
-
-            this.divided = false; // Устанавливаем флаг, что узел больше не разделен
+            this.divided = false;
         }
     }
 
-    public void subdivide() throws Exception {
-        // Создаем четыре дочерних узла
-        this.northEast = new QuadTree(this.boundary.subdivide("ne"), this.getCapacity(), this.depth + 1);
-        this.northWest = new QuadTree(this.boundary.subdivide("nw"), this.getCapacity(), this.depth + 1);
-        this.southEast = new QuadTree(this.boundary.subdivide("se"), this.getCapacity(), this.depth + 1);
-        this.southWest = new QuadTree(this.boundary.subdivide("sw"), this.getCapacity(), this.depth + 1);
+    public void subdivide() {
+        this.northEast = new QuadTree(this.boundary.subdivide("ne"), this.getCapacity(), this.depth + 1, getMAX_DEPTH());
+        this.northWest = new QuadTree(this.boundary.subdivide("nw"), this.getCapacity(), this.depth + 1, getMAX_DEPTH());
+        this.southEast = new QuadTree(this.boundary.subdivide("se"), this.getCapacity(), this.depth + 1, getMAX_DEPTH());
+        this.southWest = new QuadTree(this.boundary.subdivide("sw"), this.getCapacity(), this.depth + 1, getMAX_DEPTH());
 
-        // Устанавливаем флаг, что узел разделен
         this.divided = true;
 
-        // Перемещаем точки в дочерние узлы
-        for (Point p : new ArrayList<>(this.points)) { // Используем новый список для избежания ConcurrentModificationException
+        for (Asteroid p : new ArrayList<>(this.points)) {
             boolean inserted =
                     this.northEast.insert(p) ||
                             this.northWest.insert(p) ||
@@ -77,89 +80,82 @@ public class QuadTree {
                             this.southWest.insert(p);
 
             if (!inserted) {
-                throw new IllegalArgumentException("Capacity must be greater than 0");
+                System.err.printf("\nthis.quad.boundary: x(range)= %f to %f, y(range)=%f to %f\n" +
+                                "point.coords: x=%f, y=%f | point.velocities: Vx=%f, Vy=%f", this.boundary.getX(), this.boundary.getWidth() + this.boundary.getX(),
+                        this.boundary.getY(), this.boundary.getHeight() + this.boundary.getY(), p.getX(), p.getY(), p.getVelocityX(), p.getVelocityY());
             }
         }
-
         this.points.clear();
     }
 
-    public boolean insert(Point point) throws Exception {
+    public boolean remove(Asteroid point) {
         if (!this.boundary.contains(point)) {
-            System.out.printf("\nthis.quad.boundary: x(range)= %f to %f, y(range)=%f to %f\n" +
-                    "point.coords: x=%f, y=%f", this.boundary.getX(), this.boundary.getWidth() + this.boundary.getX(),
-                    this.boundary.getY(), this.boundary.getHeight() + this.boundary.getY(), point.getX(), point.getY());
-            return false; // Точка не попадает в границы
+            return false;
         }
 
-        // Если узел еще не разделен
         if (!this.divided) {
-            // Если узел не переполнен и глубина меньше максимальной
+            return this.points.remove(point);
+        }
+
+        if (this.northWest != null && this.northWest.remove(point)) return true;
+        if (this.northEast != null && this.northEast.remove(point)) return true;
+        if (this.southWest != null && this.southWest.remove(point)) return true;
+        if (this.southEast != null && this.southEast.remove(point)) return true;
+
+        return false;
+    }
+
+    public boolean update(Asteroid point) {
+        if (!remove(point)) {
+            return false;
+        }
+        return insert(point);
+    }
+
+
+    public boolean insert(Point point) {
+        if (!this.boundary.contains(point)) {
+            return false;
+        }
+
+        if (!this.divided) {
             if (this.points.size() < this.capacity && this.depth < MAX_DEPTH) {
-                this.points.add((Asteroid) point); // Добавляем точку в текущий узел
+                this.points.add((Asteroid) point);
                 return true;
             }
 
-            // Делим узел только если он переполнен и глубина меньше максимальной
             if (this.points.size() >= this.capacity && this.depth < MAX_DEPTH) {
-                subdivide(); // Делим узел
+                subdivide();
             }
         }
 
-        // Если узел уже разделен, пытаемся вставить точку в дочерние узлы
         if (this.northWest != null && this.northWest.insert(point)) return true;
         if (this.northEast != null && this.northEast.insert(point)) return true;
         if (this.southWest != null && this.southWest.insert(point)) return true;
         if (this.southEast != null && this.southEast.insert(point)) return true;
 
-        // Если ни один из дочерних узлов не смог вставить точку, добавляем её в текущий узел
         this.points.add((Asteroid) point);
-        return true; // Возвращаем true, так как точка успешно добавлена
+        return true;
     }
-
-
-
-//    public boolean insert(Point point) throws Exception {
-//        if (!this.boundary.contains(point)) {
-//            return false; // Точка не попадает в границы
-//        }
-//
-//        if (!this.divided) {
-//            if (this.points.size() < this.capacity && this.depth < MAX_DEPTH) {
-//                this.points.add((Asteroid) point);
-//                return true;
-//            }
-//            subdivide(); // Делим узел
-//        }
-//
-//        return (
-//                this.northWest.insert(point) ||
-//                        this.northEast.insert(point) ||
-//                        this.southWest.insert(point) ||
-//                        this.southEast.insert(point)
-//        );
-//    }
-
 
     public List<Asteroid> query(Rectangle range, List<Asteroid> found) {
         if (!range.intersects(this.boundary)) {
-            return found; // Нет пересечения с границами
+            return found;
         }
 
         if (this.divided) {
-            northWest.query(range, found);
-            northEast.query(range, found);
-            southWest.query(range, found);
-            southEast.query(range, found);
-            return found; // Возвращаем найденные астероиды
+            if (northWest != null) northWest.query(range, found);
+            if (northEast != null) northEast.query(range, found);
+            if (southWest != null) southWest.query(range, found);
+            if (southEast != null) southEast.query(range, found);
+            return found;
         }
 
-        for (Point p : points) {
+        for (Asteroid p : points) {
             if (range.contains(p)) {
-                found.add((Asteroid) p); // Приведение типа
+                found.add(p);
             }
         }
-
-        return found; // Возвращаем найденные астероиды
+        return found;
     }
 }
