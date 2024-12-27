@@ -20,12 +20,12 @@ public class Asteroid extends Point {
     private double velocityY;
     private double mass;
 
-    public Asteroid(double x, double y, Point userData) {
+    public Asteroid(double x, double y, Point userData, double boundOfVelocity, double boundOfRadius, double originOfRadius) {
         super(x, y, userData);
-        r = RandomGenerator.getDefault().nextDouble(3.0, 5.0);
+        r = RandomGenerator.getDefault().nextDouble(originOfRadius, boundOfRadius);
         mass = Math.PI * r * r;
-        velocityY = RandomGenerator.getDefault().nextDouble(-3.0,3.0);
-        velocityX = RandomGenerator.getDefault().nextDouble(-3.0,3.0);
+        velocityY = RandomGenerator.getDefault().nextDouble(-boundOfVelocity, boundOfVelocity);
+        velocityX = RandomGenerator.getDefault().nextDouble(-boundOfVelocity, boundOfVelocity);
     }
 
     public void move() {
@@ -42,9 +42,7 @@ public class Asteroid extends Point {
         if (x - r < 0) {
             x = r;
             velocityX *= -1;
-        }
-
-        else if (x + r > screenWidth) {
+        } else if (x + r > screenWidth) {
             x = screenWidth - r;
             velocityX *= -1;
         }
@@ -52,9 +50,7 @@ public class Asteroid extends Point {
         if (y - r < 0) {
             y = r;
             velocityY *= -1;
-        }
-
-        else if (y + r > screenHeight) {
+        } else if (y + r > screenHeight) {
             y = screenHeight - r;
             velocityY *= -1;
         }
@@ -86,10 +82,25 @@ public class Asteroid extends Point {
         double dy = other.y - this.y;
 
         double distanceSquared = dx * dx + dy * dy;
+        double minDistanceSquared = (this.r + other.r) * (this.r + other.r);
 
-        if (distanceSquared < 1e-10) {
+        if (distanceSquared < 1e-10 || distanceSquared >= minDistanceSquared) {
             return;
         }
+
+        double distance = Math.sqrt(distanceSquared);
+
+        double overlap = (this.r + other.r) - distance;
+        double correctionX = (dx / distance) * (overlap / 2);
+        double correctionY = (dy / distance) * (overlap / 2);
+
+        this.x -= correctionX;
+        this.y -= correctionY;
+        other.x += correctionX;
+        other.y += correctionY;
+
+        Game.getQuadTree().update(this);
+        Game.getQuadTree().update(other);
 
         double dvx = other.velocityX - this.velocityX;
         double dvy = other.velocityY - this.velocityY;
@@ -108,9 +119,11 @@ public class Asteroid extends Point {
         other.velocityY -= coefficient2 * dy;
     }
 
+
     public Rectangle getBoundary() {
-        return new Rectangle(x, y, r * 2, r * 2);
+        return new Rectangle(x - r, y - r, r * 2, r * 2);
     }
+
     public double sqDistanceFrom(Asteroid other) {
         double dx = other.x - this.x;
         double dy = other.y - this.y;

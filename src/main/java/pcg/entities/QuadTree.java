@@ -24,6 +24,7 @@ public class QuadTree {
         this.points = new ArrayList<>();
         this.divided = false;
     }
+
     public QuadTree(Rectangle boundary, int capacity, int depth, int maxDepth) {
         this.boundary = boundary;
         this.capacity = capacity;
